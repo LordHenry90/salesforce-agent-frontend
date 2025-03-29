@@ -1,9 +1,7 @@
 import os
 import json
 import time
-import uuid
 import requests
-from datetime import datetime
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
@@ -16,7 +14,7 @@ import uvicorn
 # Configurazione da variabili d'ambiente
 PORT = int(os.environ.get("PORT", 8080))
 DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
-MODEL_API_URL = os.environ.get("MODEL_API_URL", "https://lordhenry-salesforce-agent.hf.space/query")
+MODEL_API_URL = os.environ.get("MODEL_API_URL", "https://lordhenry-salesforce-agent.hf.space")
 API_KEY = os.environ.get("API_KEY", "")  # Per sicurezza tra frontend e backend
 
 # Inizializza FastAPI
@@ -45,21 +43,14 @@ class QueryResponse(BaseModel):
     query: str
     response: str
     status: str
-    timestamp: float = time.time()
 
 class FeedbackRequest(BaseModel):
     query_id: str
     rating: int
     feedback_text: Optional[str] = None
 
-class ConversationHistory(BaseModel):
-    client_id: str
-    messages: List[Dict[str, Any]] = []
-    last_updated: str = datetime.now().isoformat()
-
-# Archiviazione in-memory per cronologia (in produzione usare Redis/DB)
+# Archiviazione in-memory per cronologia conversazioni
 conversation_store = {}
-feedback_store = []
 
 # Gestione delle connessioni WebSocket
 class ConnectionManager:
@@ -72,7 +63,7 @@ class ConnectionManager:
         
         # Invia la cronologia dei messaggi se esiste
         if client_id in conversation_store:
-            for message in conversation_store[client_id].messages:
+            for message in conversation_store[client_id]:
                 await websocket.send_json(message)
 
     def disconnect(self, client_id: str):
@@ -82,20 +73,58 @@ class ConnectionManager:
     async def send_message(self, message: dict, client_id: str):
         # Aggiorna la cronologia
         if client_id not in conversation_store:
-            conversation_store[client_id] = ConversationHistory(client_id=client_id)
+            conversation_store[client_id] = []
         
-        conversation_store[client_id].messages.append(message)
-        conversation_store[client_id].last_updated = datetime.now().isoformat()
+        conversation_store[client_id].append(message)
         
         # Limita la cronologia a 50 messaggi
-        if len(conversation_store[client_id].messages) > 50:
-            conversation_store[client_id].messages = conversation_store[client_id].messages[-50:]
+        if len(conversation_store[client_id]) > 50:
+            conversation_store[client_id] = conversation_store[client_id][-50:]
         
         # Invia il messaggio se il client è connesso
         if client_id in self.active_connections:
             await self.active_connections[client_id].send_json(message)
 
 manager = ConnectionManager()
+
+# Funzione per chiamare l'API backend
+def call_backend_api(endpoint, data=None, method="GET", timeout=60):
+    """Chiama l'API backend"""
+    url = f"{MODEL_API_URL}/{endpoint.lstrip('/')}"
+    headers = {}
+    
+    if API_KEY:
+        headers["Authorization"] = f"Bearer {API_KEY}"
+    
+    try:
+        if method == "GET":
+            response = requests.get(url, headers=headers, timeout=timeout)
+        elif method == "POST":
+            headers["Content-Type"] = "application/json"
+            response = requests.post(url, headers=headers, json=data, timeout=timeout)
+        else:
+            raise ValueError(f"Metodo non supportato: {method}")
+        
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Errore nella richiesta API: {e}")
+        
+        # Informazioni più dettagliate per debug
+        error_info = {
+            "error": str(e),
+            "url": url,
+            "method": method
+        }
+        
+        if hasattr(e, "response") and e.response is not None:
+            error_info["status_code"] = e.response.status_code
+            try:
+                error_info["response_text"] = e.response.text
+            except:
+                pass
+        
+        return {"error": error_info}
 
 # Endpoint principale per la UI
 @app.get("/", response_class=HTMLResponse)
@@ -106,23 +135,30 @@ async def get_home(request: Request):
 @app.get("/status")
 async def get_status():
     try:
-        # Verifica lo stato del servizio di inferenza
-        response = requests.get(f"{MODEL_API_URL}/status", 
-                               headers={"Authorization": f"Bearer {API_KEY}"},
-                               timeout=5)
+        # Verifica lo stato del backend
+        backend_status = call_backend_api("status", method="GET", timeout=5)
         
-        if response.status_code == 200:
-            backend_status = response.json()
+        if "error" in backend_status:
+            backend_ready = False
+            backend_error = str(backend_status["error"])
         else:
-            backend_status = {"ready": False, "error": f"Backend returned status code {response.status_code}"}
+            backend_ready = backend_status.get("ready", False)
+            backend_error = backend_status.get("error")
+        
+        return {
+            "frontend": {"status": "online", "active_clients": len(manager.active_connections)},
+            "backend": {
+                "status": "online" if backend_ready else "offline",
+                "ready": backend_ready,
+                "error": backend_error,
+                "model": backend_status.get("model", "unknown")
+            }
+        }
     except Exception as e:
-        backend_status = {"ready": False, "error": str(e)}
-    
-    return {
-        "frontend": {"status": "online"},
-        "backend": backend_status,
-        "active_clients": len(manager.active_connections)
-    }
+        return {
+            "frontend": {"status": "online"},
+            "backend": {"status": "error", "error": str(e)}
+        }
 
 # Endpoint per il controllo salute
 @app.get("/health")
@@ -133,101 +169,27 @@ async def health_check():
 @app.post("/api/query")
 async def query_agent(request: QueryRequest):
     try:
-        # Genera un ID univoco per la query
-        query_id = str(uuid.uuid4())
-        
-        # Invia la richiesta al servizio di inferenza
-        payload = {
-            "query": request.query,
-            "type": request.type
-        }
-        
-        response = requests.post(
-            f"{MODEL_API_URL}/query",
-            json=payload,
-            headers={"Authorization": f"Bearer {API_KEY}"},
-            timeout=60  # Timeout più lungo per inferenza
+        # Invia la richiesta al backend
+        backend_response = call_backend_api(
+            "query",
+            data=request.dict(),
+            method="POST",
+            timeout=60
         )
         
-        if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, 
-                               detail=f"Backend error: {response.text}")
+        if "error" in backend_response:
+            raise HTTPException(status_code=503, detail=f"Errore backend: {backend_response['error']}")
         
-        response_data = response.json()
+        # Genera un ID per questa query
+        import uuid
+        query_id = str(uuid.uuid4())
         
         return QueryResponse(
             query_id=query_id,
             query=request.query,
-            response=response_data.get("response", ""),
+            response=backend_response.get("response", ""),
             status="success"
         )
-    except requests.Timeout:
-        raise HTTPException(status_code=504, detail="Backend service timeout")
-    except requests.RequestException as e:
-        raise HTTPException(status_code=503, detail=f"Backend service error: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# Endpoint per il feedback
-@app.post("/api/feedback")
-async def provide_feedback(request: FeedbackRequest):
-    try:
-        # Archivia il feedback
-        feedback_data = {
-            "query_id": request.query_id,
-            "rating": request.rating,
-            "feedback_text": request.feedback_text,
-            "timestamp": datetime.now().isoformat()
-        }
-        
-        feedback_store.append(feedback_data)
-        
-        # Opzionale: invia anche al backend
-        try:
-            requests.post(
-                f"{MODEL_API_URL}/feedback",
-                json=feedback_data,
-                headers={"Authorization": f"Bearer {API_KEY}"},
-                timeout=5
-            )
-        except Exception as e:
-            print(f"Errore nell'invio del feedback al backend: {e}")
-            # Non fallisce se il backend non riceve il feedback
-        
-        return {"status": "Feedback ricevuto, grazie!"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# Endpoint per le metriche
-@app.get("/api/metrics")
-async def get_metrics():
-    try:
-        # Metriche locali
-        local_metrics = {
-            "active_users": len(manager.active_connections),
-            "conversation_count": len(conversation_store),
-            "feedback_count": len(feedback_store),
-            "average_rating": sum(item["rating"] for item in feedback_store) / len(feedback_store) 
-                              if feedback_store else 0
-        }
-        
-        # Prova a ottenere metriche dal backend
-        try:
-            response = requests.get(
-                f"{MODEL_API_URL}/metrics",
-                headers={"Authorization": f"Bearer {API_KEY}"},
-                timeout=5
-            )
-            
-            if response.status_code == 200:
-                backend_metrics = response.json()
-                # Combina metriche locali e di backend
-                return {**local_metrics, "backend": backend_metrics}
-        except Exception as e:
-            print(f"Errore nel recupero metriche dal backend: {e}")
-        
-        # Ritorna solo metriche locali se il backend non è disponibile
-        return local_metrics
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -257,33 +219,25 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             )
             
             try:
-                # Invia la richiesta al servizio di inferenza
-                payload = {
-                    "query": query,
-                    "type": query_type,
-                    "client_id": client_id
-                }
-                
-                response = requests.post(
-                    f"{MODEL_API_URL}/query",
-                    json=payload,
-                    headers={"Authorization": f"Bearer {API_KEY}"},
-                    timeout=120  # Timeout più lungo per inferenza
+                # Invia la richiesta al backend
+                backend_response = call_backend_api(
+                    "query",
+                    data={"query": query, "type": query_type},
+                    method="POST",
+                    timeout=60
                 )
                 
-                if response.status_code != 200:
-                    raise Exception(f"Backend error: {response.text}")
-                
-                response_data = response.json()
+                if "error" in backend_response:
+                    error_msg = str(backend_response["error"])
+                    await manager.send_message(
+                        {"type": "error", "content": f"Errore backend: {error_msg}", "timestamp": time.time()},
+                        client_id
+                    )
+                    continue
                 
                 # Invia risposta al client
                 await manager.send_message(
-                    {"type": "assistant", "content": response_data.get("response", ""), "timestamp": time.time()},
-                    client_id
-                )
-            except requests.Timeout:
-                await manager.send_message(
-                    {"type": "error", "content": "Il server ha impiegato troppo tempo a rispondere. Riprova più tardi.", "timestamp": time.time()},
+                    {"type": "assistant", "content": backend_response.get("response", ""), "timestamp": time.time()},
                     client_id
                 )
             except Exception as e:
