@@ -200,7 +200,7 @@ async def query_agent(request: QueryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# WebSocket per comunicazione in tempo reale
+# Modifica questa parte nella gestione WebSocket
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
     await manager.connect(websocket, client_id)
@@ -226,10 +226,10 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             )
             
             try:
-                # Invia la richiesta al backend
+                # Invia la richiesta al backend CON IL CLIENT_ID
                 backend_response = call_backend_api(
                     "query",
-                    data={"query": query, "type": query_type},
+                    data={"query": query, "type": query_type, "client_id": client_id},  # Aggiungi client_id
                     method="POST",
                     timeout=60
                 )
