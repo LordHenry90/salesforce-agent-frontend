@@ -144,6 +144,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         websocket.onclose = function() {
             console.log('WebSocket disconnesso');
+			
+			if (isProcessing) {
+				setProcessingState(false);
+			}
             
             // Tentativo di riconnessione con backoff esponenziale
             if (websocketReconnectAttempts < 5) {
@@ -162,36 +166,46 @@ document.addEventListener('DOMContentLoaded', function() {
         
         websocket.onerror = function(error) {
             console.error('Errore WebSocket:', error);
+			
+			// Ripristina sempre lo stato dell'interfaccia in caso di errore
+			if (isProcessing) {
+				setProcessingState(false);
+			}
+			
             errorMessage.textContent = 'Errore di connessione. Ricarica la pagina per riprovare.';
             errorMessage.classList.remove('d-none');
         };
     }
     
     // Gestisci i messaggi WebSocket
-    function handleWebSocketMessage(message) {
-        switch (message.type) {
-            case 'user':
-                addUserMessage(message.content);
-                break;
-            case 'assistant':
-                addAssistantMessage(message.content);
-                setProcessingState(false);
-                showFeedbackCard();
-                break;
-            case 'status':
-                addStatusMessage(message.content);
-                break;
-            case 'error':
-                addErrorMessage(message.content);
-                setProcessingState(false);
-                break;
-            default:
-                console.warn('Tipo di messaggio sconosciuto:', message.type);
-        }
-        
-        // Scorrimento automatico
-        scrollToBottom();
-    }
+	function handleWebSocketMessage(message) {
+		switch (message.type) {
+			case 'user':
+				addUserMessage(message.content);
+				break;
+			case 'assistant':
+				addAssistantMessage(message.content);
+				// Assicurati di ripristinare lo stato qui
+				setProcessingState(false);
+				showFeedbackCard();
+				break;
+			case 'status':
+				addStatusMessage(message.content);
+				break;
+			case 'error':
+				addErrorMessage(message.content);
+				// Ripristina sempre lo stato anche in caso di errore
+				setProcessingState(false);
+				break;
+			default:
+				console.warn('Tipo di messaggio sconosciuto:', message.type);
+				// Ripristina lo stato anche per messaggi sconosciuti
+				setProcessingState(false);
+		}
+		
+		// Scorrimento automatico
+		scrollToBottom();
+	}
     
     // Invia messaggio al server
     function sendMessage() {
@@ -203,6 +217,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Nascondi card feedback
         feedbackCard.classList.add('d-none');
+		
+		// Imposta il timeout di sicurezza
+		setupSafetyTimeout();
         
         // Imposta stato elaborazione
         setProcessingState(true);
@@ -367,21 +384,26 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Imposta lo stato di elaborazione
-    function setProcessingState(processing) {
-        isProcessing = processing;
-        
-        if (processing) {
-            sendIcon.classList.add('d-none');
-            loadingIcon.classList.remove('d-none');
-            userInput.disabled = true;
-            sendButton.disabled = true;
-        } else {
-            sendIcon.classList.remove('d-none');
-            loadingIcon.classList.add('d-none');
-            userInput.disabled = false;
-            sendButton.disabled = false;
-        }
-    }
+	function setProcessingState(processing) {
+		isProcessing = processing;
+		
+		if (processing) {
+			sendIcon.classList.add('d-none');
+			loadingIcon.classList.remove('d-none');
+			userInput.disabled = true;
+			sendButton.disabled = true;
+		} else {
+			// Importante: riabilita l'input
+			sendIcon.classList.remove('d-none');
+			loadingIcon.classList.add('d-none');
+			userInput.disabled = false;
+			sendButton.disabled = false;
+			
+			// Debug: verifica che questi elementi esistano
+			console.log("Riabilito input:", userInput);
+			console.log("Riabilito button:", sendButton);
+		}
+	}
     
     // Scorrimento automatico verso il basso
     function scrollToBottom() {
@@ -498,4 +520,29 @@ document.addEventListener('DOMContentLoaded', function() {
         errorMessage.textContent = message;
         errorMessage.classList.remove('d-none');
     }
+	
+	// Handler per errori imprevisti
+	window.addEventListener('error', function(event) {
+		console.error('Errore globale rilevato:', event.error);
+		
+		// Ripristina lo stato dell'interfaccia in caso di errore
+		if (isProcessing) {
+			console.log("Ripristino stato UI dopo errore");
+			setProcessingState(false);
+		}
+	});
+
+	// Aggiungi anche un timeout di sicurezza
+	function setupSafetyTimeout() {
+		if (isProcessing) {
+			// Se dopo 60 secondi l'elaborazione è ancora in corso, ripristina l'interfaccia
+			setTimeout(function() {
+				if (isProcessing) {
+					console.log("Timeout di sicurezza: ripristino interfaccia");
+					addErrorMessage("La richiesta sta impiegando troppo tempo. L'interfaccia è stata ripristinata.");
+					setProcessingState(false);
+				}
+			}, 60000); // 60 secondi
+		}
+	}
 });
