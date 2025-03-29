@@ -220,7 +220,6 @@ code {
 .navbar-brand img {
   height: 40px; /* Aumenta la dimensione del logo */
   margin-right: 10px;
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.7)); /* Aggiungi un sottile alone */
 }
 
 /* Stili per gli stati del sistema */
