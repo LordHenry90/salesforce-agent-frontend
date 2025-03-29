@@ -4,7 +4,7 @@ services:
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: python app.py
-    repo: https://github.com/Lordhenry/salesforce-agent.git # Modifica con il tuo repository
+    repo: https://github.com/Lordhenry/salesforce-agent-frontend.git # Modifica con il tuo repository
     branch: main
     healthCheckPath: /health
     envVars:
