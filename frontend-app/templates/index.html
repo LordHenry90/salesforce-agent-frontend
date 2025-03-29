@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salesforce AI Assistant</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/github.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <img src="/static/img/logo.png" alt="Salesforce AI Assistant" height="30" class="d-inline-block align-text-top me-2">
+                Salesforce AI Assistant
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <span class="nav-link" id="status-indicator">
+                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                            Inizializzazione...
+                        </span>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="modeDropdown" role="button" data-bs-toggle="dropdown">
+                            Modalità: Standard
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item active" href="#" data-mode="standard">Standard</a></li>
+                            <li><a class="dropdown-item" href="#" data-mode="complete">Soluzione Completa</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container my-4">
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light py-3">
+                        <h5 class="mb-0">Assistente AI per Salesforce</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="conversation" class="conversation-container mb-3">
+                            <div class="welcome-message">
+                                <h4>Benvenuto nel tuo assistente AI per Salesforce!</h4>
+                                <p>Sono qui per aiutarti a risolvere problemi tecnici e fornire soluzioni a requisiti di business su Salesforce.</p>
+                                <p>Puoi chiedermi:</p>
+                                <ul>
+                                    <li>Come implementare funzionalità specifiche</li>
+                                    <li>Best practices per configurazioni</li>
+                                    <li>Soluzioni tecniche per requisiti di business</li>
+                                    <li>Esempi di codice Apex, Lightning o configurazioni</li>
+                                </ul>
+                                <p class="small text-muted">Scegli la modalità "Soluzione Completa" dal menu in alto per ottenere risposte più dettagliate con codice e approcci alternativi.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="input-group">
+                            <textarea id="user-input" class="form-control" placeholder="Scrivi la tua domanda su Salesforce..." rows="2"></textarea>
+                            <button id="send-btn" class="btn btn-primary" type="button">
+                                <span id="send-icon">Invia</span>
+                                <span id="loading-icon" class="d-none">
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                </span>
+                            </button>
+                        </div>
+                        
+                        <div class="mt-2 d-flex justify-content-between align-items-center">
+                            <div class="form-text text-muted d-none" id="error-message">Errore durante la connessione all'assistente.</div>
+                            <button id="clear-btn" class="btn btn-sm btn-outline-secondary ms-auto">Nuova conversazione</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm mb-4 d-none" id="feedback-card">
+                    <div class="card-header bg-light py-3">
+                        <h5 class="mb-0">Valuta la risposta</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Quanto è stata utile questa risposta?</label>
+                            <div class="rating">
+                                <span class="star" data-rating="1">★</span>
+                                <span class="star" data-rating="2">★</span>
+                                <span class="star" data-rating="3">★</span>
+                                <span class="star" data-rating="4">★</span>
+                                <span class="star" data-rating="5">★</span>
+                                <span class="rating-text ms-2" id="rating-text">Seleziona una valutazione</span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="feedback-text" class="form-label">Commenti aggiuntivi (opzionale)</label>
+                            <textarea id="feedback-text" class="form-control" rows="2" placeholder="Cosa potremmo migliorare?"></textarea>
+                        </div>
+                        <button id="submit-feedback" class="btn btn-primary">Invia feedback</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer mt-auto py-3 bg-light">
+        <div class="container text-center">
+            <span class="text-muted">Salesforce AI Assistant © 2025 | Alimentato da LLM locale</span>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/lib/core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/lib/languages/javascript.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/lib/languages/java.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/lib/languages/xml.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
