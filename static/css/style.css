@@ -210,3 +210,28 @@ code {
         flex-direction: column;
     }
 }
+/* Aggiungi questo al tuo file CSS */
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+}
+
+.navbar-brand img {
+  height: 40px; /* Aumenta la dimensione del logo */
+  margin-right: 10px;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.7)); /* Aggiungi un sottile alone */
+}
+
+/* Stili per gli stati del sistema */
+#status-indicator.initializing {
+  color: #f8d7da;
+}
+
+#status-indicator.ready {
+  color: #d4edda;
+}
+
+#status-indicator.error {
+  color: #f8d7da;
+}

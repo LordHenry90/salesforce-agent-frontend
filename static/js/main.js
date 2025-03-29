@@ -47,30 +47,37 @@ document.addEventListener('DOMContentLoaded', function() {
     // FUNZIONI
     
     // Verifica lo stato dell'agente
-    function checkAgentStatus() {
-        fetch('/status')
-            .then(response => response.json())
-            .then(data => {
-                if (data.ready) {
-                    statusIndicator.innerHTML = '<span class="text-success">●</span> Pronto';
-                    statusIndicator.classList.add('ready');
-                } else {
-                    if (data.error) {
-                        statusIndicator.innerHTML = '<span class="text-danger">●</span> Errore';
-                        statusIndicator.classList.add('error');
-                        showError(`Errore nell'inizializzazione: ${data.error}`);
-                    } else {
-                        // Ricontrolla ogni 5 secondi
-                        setTimeout(checkAgentStatus, 5000);
-                    }
-                }
-            })
-            .catch(err => {
-                console.error('Errore nel controllo stato:', err);
-                statusIndicator.innerHTML = '<span class="text-danger">●</span> Errore';
-                statusIndicator.classList.add('error');
-            });
-    }
+	function checkAgentStatus() {
+		fetch('/status')
+			.then(response => response.json())
+			.then(data => {
+				const statusIndicator = document.getElementById('status-indicator');
+				
+				// Aggiorna la UI in base allo stato del backend
+				if (data.backend && data.backend.ready) {
+					statusIndicator.innerHTML = '<span class="text-success">●</span> Pronto';
+					statusIndicator.classList.remove('initializing');
+					statusIndicator.classList.add('ready');
+					statusIndicator.classList.remove('error');
+				} else if (data.backend && data.backend.error) {
+					statusIndicator.innerHTML = '<span class="text-danger">●</span> Errore';
+					statusIndicator.classList.remove('initializing');
+					statusIndicator.classList.remove('ready');
+					statusIndicator.classList.add('error');
+				} else {
+					// Continua a verificare lo stato ogni 5 secondi
+					statusIndicator.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Inizializzazione...';
+					statusIndicator.classList.add('initializing');
+					setTimeout(checkAgentStatus, 5000);
+				}
+			})
+			.catch(err => {
+				console.error('Errore nel controllo stato:', err);
+				const statusIndicator = document.getElementById('status-indicator');
+				statusIndicator.innerHTML = '<span class="text-danger">●</span> Errore';
+				statusIndicator.classList.add('error');
+			});
+	}
     
     // Imposta i gestori di eventi
     function setupEventListeners() {
