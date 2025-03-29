@@ -90,7 +90,14 @@ manager = ConnectionManager()
 # Funzione per chiamare l'API backend
 def call_backend_api(endpoint, data=None, method="GET", timeout=60):
     """Chiama l'API backend"""
-    url = f"{MODEL_API_URL}/{endpoint.lstrip('/')}"
+    # Assicurati che MODEL_API_URL non termini con uno slash
+    base_url = MODEL_API_URL.rstrip('/')
+    
+    # Assicurati che endpoint inizi con uno slash
+    endpoint_path = f"/{endpoint.lstrip('/')}"
+    
+    url = f"{base_url}{endpoint_path}"
+    
     headers = {}
     
     if API_KEY:
