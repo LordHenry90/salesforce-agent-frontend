@@ -16,7 +16,7 @@ import uvicorn
 # Configurazione da variabili d'ambiente
 PORT = int(os.environ.get("PORT", 8080))
 DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
-MODEL_API_URL = os.environ.get("MODEL_API_URL", "https://huggingface.co/spaces/Lordhenry/salesforce-agent/api")
+MODEL_API_URL = os.environ.get("MODEL_API_URL", "https://lordhenry-salesforce-agent.hf.space/query")
 API_KEY = os.environ.get("API_KEY", "")  # Per sicurezza tra frontend e backend
 
 # Inizializza FastAPI

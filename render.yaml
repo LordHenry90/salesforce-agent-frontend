@@ -14,7 +14,7 @@ services:
         value: false
       - key: MODEL_API_URL
         # Modifica con l'URL del tuo spazio Hugging Face
-        value: https://huggingface.co/spaces/Lordhenry/salesforce-agent/api
+        value: https://lordhenry-salesforce-agent.hf.space/query
       - key: API_KEY
         # Imposta tramite dashboard Render o variabile d'ambiente
         sync: false
