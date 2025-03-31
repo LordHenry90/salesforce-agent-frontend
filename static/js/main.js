@@ -16,7 +16,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const submitFeedback = document.getElementById('submit-feedback');
     
     // Variabili di stato
-    let currentMode = 'standard';
     let clientId = generateClientId();
     let websocket = null;
     let websocketReconnectAttempts = 0;
@@ -93,19 +92,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // Pulizia conversazione
         clearButton.addEventListener('click', clearConversation);
         
-        // Cambio modalità
-        document.querySelectorAll('.dropdown-item').forEach(item => {
-            item.addEventListener('click', function(e) {
-                e.preventDefault();
-                const mode = this.getAttribute('data-mode');
-                changeMode(mode);
-                
-                // Aggiorna UI
-                document.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
-                this.classList.add('active');
-                modeDropdown.textContent = `Modalità: ${mode === 'standard' ? 'Standard' : 'Soluzione Completa'}`;
-            });
-        });
         
         // Sistema di valutazione
         ratingStars.forEach(star => {
@@ -227,8 +213,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Invia al WebSocket
         if (websocket && websocket.readyState === WebSocket.OPEN) {
             websocket.send(JSON.stringify({
-                query: message,
-                type: currentMode
+                query: message
             }));
             
             // Pulisci input
@@ -378,10 +363,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return div.innerHTML;
     }
     
-    // Cambia modalità di risposta
-    function changeMode(mode) {
-        currentMode = mode;
-    }
     
     // Imposta lo stato di elaborazione
 	function setProcessingState(processing) {

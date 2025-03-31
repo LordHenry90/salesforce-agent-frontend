@@ -36,7 +36,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Modelli per le richieste e risposte
 class QueryRequest(BaseModel):
     query: str
-    type: str = "standard"  # "standard" o "complete"
+    type: str = "default"  # "default" o "complete"
 
 class QueryResponse(BaseModel):
     query_id: str
@@ -211,7 +211,6 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             
             # Processa la query
             query = data.get("query", "")
-            query_type = data.get("type", "standard")
             
             # Aggiungi alla cronologia come messaggio utente
             await manager.send_message(
@@ -229,7 +228,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 # Invia la richiesta al backend CON IL CLIENT_ID
                 backend_response = call_backend_api(
                     "query",
-                    data={"query": query, "type": query_type, "client_id": client_id},  # Aggiungi client_id
+                    data={"query": query, "client_id": client_id},  # Aggiungi client_id
                     method="POST",
                     timeout=60
                 )
